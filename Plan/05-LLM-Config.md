@@ -8,7 +8,7 @@
 
 ```text
 BASE_URL : http://127.0.0.1:8045/v1
-API_KEY  : sk-d53238016e6c4b9a8107e0fa94c799a1
+API_KEY  : sk-your-key-here   # 真实密钥只存本地 .env，不入库（安全自检 C.4）
 ```
 
 - 该端点为本地 OpenAI-compatible 服务，走标准 `/v1/chat/completions` + function calling。
@@ -43,7 +43,7 @@ gemini-3.8-flash-tiered
 实际 `.env`（本地、不入库）：
 
 ```dotenv
-OPENAI_API_KEY=sk-d53238016e6c4b9a8107e0fa94c799a1
+OPENAI_API_KEY=sk-your-key-here
 OPENAI_BASE_URL=http://127.0.0.1:8045/v1
 OPENAI_MODEL=gemini-3.8-flash-medium
 ```

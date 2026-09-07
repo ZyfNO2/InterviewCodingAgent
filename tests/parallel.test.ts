@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { z } from "zod";
 import { Context } from "../src/core/context.js";
 import type { AgentConfig } from "../src/agent/types.js";

@@ -125,50 +125,84 @@ npm start -- --workspace ./examples/demo --max-steps 20 "你的任务"
 结果：workspace 下出现 hello.py，shell 输出 "Hello Coding Agent"，最终答复转述运行结果。
 ```
 
-### 健壮性（`scripts/robustness-check.mjs`，10/10 通过）
+## 测试与验证
 
-- 越权路径（`../../.env`、绝对路径 `C:\...`）→ `path escapes workspace`
-- 未知工具 / 非法 JSON 入参 / zod 校验失败 → 结构化错误回灌，不抛出
-- 读不存在文件（ENOENT）、shell 非零退出 → 错误文本回灌，Agent 继续或合理收尾
-- `--max-steps 1` → 返回 `Reached maxSteps (1) without a final answer.`，无死循环
+### 测试分层（`npm test`，47/47 通过，vitest）
 
-### 单元测试（`npm test`，23/23 通过）
-
-基于 Node 内置 `node:test`，无额外测试框架依赖：
+| 层级 | 对象 | 需要真实模型 | 位置 |
+| --- | --- | --- | --- |
+| 静态检查 | `npm run typecheck`（src + tests 双 tsconfig） | 否 | — |
+| 单元测试 | Tool / Registry / 路径约束 / LLM 响应解析（mock SDK） | 否 | `tests/tools` / `registry` / `provider` |
+| 集成测试 | Agent Loop（ScriptedLLM Mock，经 Context 注入，不触网） | 否 | `tests/agent` / `permission` / `ask-user` / `parallel` |
+| E2E 冒烟 | CLI + 真实端点（`node scripts/e2e-smoke.mjs`） | 是 | `docs/e2e-smoke-log.md` 留档 |
 
 | 文件 | 覆盖 |
 | --- | --- |
 | `tests/registry.test.ts` | register 重名报错 / get / list / toLLMSchema 结构 / execute 四类失败回灌不抛出 |
-| `tests/tools.test.ts` | read/write 往返、自动建父目录、路径越权（相对/绝对）被拒、shell 退出码与 stdout/stderr 捕获、cwd |
+| `tests/tools.test.ts` | read/write 往返、自动建父目录、路径越权（相对/绝对）被拒、shell 退出码与 stdout/stderr 捕获、cwd、GBK/UTF-8 自适应解码 |
 | `tests/agent.test.ts` | Mock LLM（经 Context 注入 `"llm"`）驱动多轮闭环：tool_calls → 执行 → 回灌 → final；maxSteps 兜底；错误回灌不中断 |
 | `tests/permission.test.ts` | 无 permission 服务 fail-closed、拒绝时工具未执行、批准执行、safe 工具零检查、CLI y/yes 语义、EOF 视为拒绝 |
 | `tests/ask-user.test.ts` | 人类输入回灌、接口形状（safe/非并行）、zod 失败、EOF 不崩溃 |
 | `tests/parallel.test.ts` | 并发探针证明真实并行、混合批次顺序语义、真实工具 parallelSafe 标记、批次中失败不阻塞、batchStats 分组 |
+| `tests/provider.test.ts` | `tool_calls` / `final` 两态解析、null content 兜底、无 choices 报错、tools/tool_choice 请求透传、apiKey/baseUrl 构造透传（`vi.mock("openai")` 不触网） |
 
-## 关键设计取舍
+### E2E 冒烟（真实端点）
+
+```bash
+npm run build
+node scripts/e2e-smoke.mjs --out docs/e2e-smoke-log.md
+```
+
+覆盖 Case 1（总结文件）、Case 2（建 hello.py → 运行 → 汇报，含 Permission 批准输入）、Parallel（三文件并行读取）。
+最近一次运行 7/7 PASS，完整日志见 [`docs/e2e-smoke-log.md`](docs/e2e-smoke-log.md)。
+
+### 安全说明
+
+- 仓库不含真实密钥（`git grep "sk-"` 自检通过；真实 key 只在本地 `.env`，已被 `.gitignore` 忽略并验证 `git check-ignore`）。
+- **shell 工具风险与缓解**：`shell` 以 workspace 为 `cwd` 执行任意命令（60s 超时、1MB×输出截断、`windowsHide`），但**没有命令白名单**——模型可请求任何命令。缓解措施：`risk: "dangerous"` 强制人类批准（fail-closed，EOF/无服务一律拒绝）、全量 JSONL Trace 事后审计、拒绝结果回灌模型促使其收敛。**此工具仍应只在受信任的本地环境使用**。
+- 文件工具被路径约束限制在 workspace 内（相对/绝对路径逃逸均被拒），但 `shell` 内部命令（如 `cat ../x`）不受该约束——这是当前已知边界。
+
+### 遗留假设与未验证项
+
+- 并行仅覆盖"连续 parallelSafe 分组"策略；未验证极端并发（如 100+ 文件同时读取）下的 fd/内存行为。
+- shell 60s 超时逻辑未写自动化测试（等待成本高），超时路径由 `exec` 内置 `timeout` 保证，属未实测的信任项。
+- `tests/provider.test.ts` 通过 mock SDK 验证请求/解析形状，真实 SDK 版本升级（openai ^5）时形状断言需复查。
+- 端点兼容性假设：目标端点支持 OpenAI `tools`/`tool_calls` 并要求回灌消息带 `type:"function"`（已在代码中处理）；其他兼容端点未测试。
+- 管道输入（非 TTY）下批准/ask_user 依赖行缓冲队列，交互 TTY 场景由人工演示验证过，自动化测试未覆盖 TTY 行为。
+
+## 技术故事
+
+这个项目按"小而完整的 Phase"推进：Phase 1 冻结架构交付最小 Runtime（Context / Registry / Agent Loop + 三工具），Phase 2 在不改动 Loop 核心的前提下通过扩展点挂载 Permission / ask_user / Parallel，Phase 3 收敛为质量门禁与交付。
 
 - **不做**插件系统、生命周期、Context Policy、多 Agent、RAG —— 保持最小正确规模。
 - **错误回灌而非中断**：工具失败以文本回灌模型，Loop 有自我纠正机会（已验证 ENOENT 场景）。
-- **Registry 是能力扩展点**：阶段二的 permission、parallel tool 挂在此处，不改 Agent Loop。
+- **Registry 是能力扩展点**：permission、parallel tool 挂在此处，不改 Agent Loop。
 - **消息闭环**：遵循 OpenAI function calling 规范（`assistant.tool_calls` 带 `type:"function"` + `role:"tool"` + `tool_call_id` 原样带回）。
 
 ## 目录结构
 
 ```text
 src/
-├── index.ts              # 入口：解析参数 → 组装 Context → 跑 Agent
+├── index.ts              # 入口：解析参数 → 组装 Context → 跑 Agent → Trace
 ├── agent/
 │   ├── agent.ts          # Agent Loop
 │   └── types.ts          # Tool / ToolResult / Message / LLMResponse
 ├── core/
-│   └── context.ts        # 极简 DI 容器
+│   ├── context.ts        # 极简 DI 容器
+│   ├── permission.ts     # PermissionService（接口 + CLI 实现 + fail-closed）
+│   └── trace.ts          # JSONL 运行 Trace（旁路记录，可审计回放）
 ├── llm/
 │   └── provider.ts       # OpenAI-compatible 封装 + 响应解析
 ├── tools/
-│   ├── registry.ts       # 注册 / 查找 / 导出 LLM schema / 统一执行
+│   ├── registry.ts       # 注册 / 查找 / LLM schema / 权限串接 / 批量并行执行
 │   ├── read-file.ts
 │   ├── write-file.ts
-│   └── shell.ts
+│   ├── shell.ts
+│   └── ask-user.ts       # Human-in-the-loop 提问工具
 └── cli/
-    └── cli.ts            # 参数解析 + readline + 输出渲染
+    ├── cli.ts            # 参数解析 + 事件渲染
+    └── prompt.ts         # 共享 readline 封装（行缓冲队列）
+tests/                    # vitest 单元 + 集成（Mock LLM 不触网）
+scripts/                  # robustness-check / e2e-smoke
+docs/                     # E2E 冒烟运行日志
 ```

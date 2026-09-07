@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { z } from "zod";
 import { ToolRegistry } from "../src/tools/registry.js";
 import { readFileTool } from "../src/tools/read-file.js";

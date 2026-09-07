@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after, describe, it } from "node:test";
+import { afterAll, describe, it } from "vitest";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -18,7 +18,7 @@ import type { AgentConfig, Tool } from "../src/agent/types.js";
 
 const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "agent-perm-test-"));
 
-after(async () => {
+afterAll(async () => {
   await fs.rm(tmpRoot, { recursive: true, force: true });
 });
 

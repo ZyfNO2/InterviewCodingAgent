@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { z } from "zod";
 import { createAskUserTool } from "../src/tools/ask-user.js";
 import type { Tool } from "../src/agent/types.js";
