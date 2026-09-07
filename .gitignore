@@ -5,6 +5,7 @@ node_modules/
 
 # Cache & build
 dist/
+dist-test/
 build/
 .npm-cache/
 .eslintcache

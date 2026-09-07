@@ -102,6 +102,16 @@ npm start -- --workspace ./examples/demo --max-steps 20 "你的任务"
 - 读不存在文件（ENOENT）、shell 非零退出 → 错误文本回灌，Agent 继续或合理收尾
 - `--max-steps 1` → 返回 `Reached maxSteps (1) without a final answer.`，无死循环
 
+### 单元测试（`npm test`，23/23 通过）
+
+基于 Node 内置 `node:test`，无额外测试框架依赖：
+
+| 文件 | 覆盖 |
+| --- | --- |
+| `tests/registry.test.ts` | register 重名报错 / get / list / toLLMSchema 结构 / execute 四类失败回灌不抛出 |
+| `tests/tools.test.ts` | read/write 往返、自动建父目录、路径越权（相对/绝对）被拒、shell 退出码与 stdout/stderr 捕获、cwd |
+| `tests/agent.test.ts` | Mock LLM（经 Context 注入 `"llm"`）驱动多轮闭环：tool_calls → 执行 → 回灌 → final；maxSteps 兜底；错误回灌不中断 |
+
 ## 关键设计取舍
 
 - **不做**插件系统、生命周期、Context Policy、多 Agent、RAG —— 保持最小正确规模。
