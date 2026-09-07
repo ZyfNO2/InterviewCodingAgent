@@ -3,10 +3,12 @@ import { serializeToolCall } from "./types.js";
 import type { Context } from "../core/context.js";
 import { ToolRegistry } from "../tools/registry.js";
 import { createSession, type AgentSession } from "../core/session.js";
+import type { MemoryService } from "../core/memory.js";
+import { buildSystemPrompt } from "./prompt.js";
 import { resolveToolResultCharLimit, truncateToolResultOutput } from "../core/context-manager.js";
 import type { LLMProvider } from "../llm/provider.js";
 
-export { SYSTEM_PROMPT } from "../core/session.js";
+export { SYSTEM_PROMPT } from "./prompt.js";
 
 export interface AgentResult {
   finalText: string;
@@ -43,6 +45,23 @@ export class Agent {
 
     // Session 事件（旁路）：首 turn 视为建会话；每个用户任务一个 session_turn
     if (session.userTurns === 0) {
+      // doc 10：Session 启动时 loadSoul() 并注入稳定前缀（仅首 turn 一次，会话内保持前缀稳定）
+      let soul = "";
+      if (this.ctx.has("memory")) {
+        try {
+          soul = await this.ctx.resolve<MemoryService>("memory").loadSoul();
+        } catch {
+          soul = ""; // 读取失败按无 Soul 处理，不阻塞会话
+        }
+      }
+      const systemPrompt = buildSystemPrompt({ soul, goal: session.goal, plan: session.plan });
+      const systemMsg = session.messages[0];
+      if (systemMsg && systemMsg.role === "system") {
+        systemMsg.content = systemPrompt;
+      } else {
+        session.messages.unshift({ role: "system", content: systemPrompt });
+      }
+      this.onEvent?.({ type: "memory_loaded", sessionId: session.id, soulChars: soul.trim().length });
       this.onEvent?.({ type: "session_start", sessionId: session.id });
     }
     this.onEvent?.({
@@ -101,6 +120,8 @@ export class Agent {
 export type AgentEvent =
   | { type: "run_start"; task: string; workspace: string }
   | { type: "session_start"; sessionId: string }
+  | { type: "session_turn"; sessionId: string; userTurns: number; task: string }
+  | { type: "memory_loaded"; sessionId: string; soulChars: number }
   | { type: "session_turn"; sessionId: string; userTurns: number; task: string }
   | { type: "llm_call"; step: number; request: ChatMessage[]; response: LLMResponse }
   | { type: "tool_call"; step: number; call: ToolCall }

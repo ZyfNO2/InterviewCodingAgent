@@ -12,6 +12,7 @@ import { shellTool } from "../tools/shell.js";
 import { createAskUserTool } from "../tools/ask-user.js";
 import { CliPermissionService } from "../core/permission.js";
 import { createSession, type AgentSession } from "../core/session.js";
+import { MarkdownMemoryService, initSoul } from "../core/memory.js";
 
 /**
  * Web 后端（doc 06 接线）：把 Mock 前端接到真实 Runtime。
@@ -182,6 +183,7 @@ async function startRun(
   ctx.provide("llm", llm);
   ctx.provide("tools", tools);
   ctx.provide("permission", new CliPermissionService(makeWebPrompt("permission", send, session.pending)));
+  ctx.provide("memory", new MarkdownMemoryService(config.workspace)); // doc 10：Soul 长期记忆
 
   const agent = new Agent(llm, tools, ctx, config, (event: AgentEvent) => {
     const contractEvent = translateAgentEvent(event, task);
@@ -247,6 +249,25 @@ const server = http.createServer(async (req, res) => {
     if (!agentSession) {
       agentSession = createSession(requestedId);
       agentSessions.set(agentSession.id, agentSession);
+    }
+
+    // doc 10 B.4：/init 命令在 Web 入口同样拦截，不作为任务丢给 LLM
+    if (task.startsWith("/init")) {
+      const memory = new MarkdownMemoryService(workspaceAbs);
+      const reply = await initSoul(memory, task.slice("/init".length).trim() || undefined);
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      try {
+        if (!res.writableEnded) {
+          res.write(`data: ${JSON.stringify({ type: "done", text: reply })}\n\n`);
+        }
+      } catch {
+        /* 客户端已断开 */
+      }
+      return;
     }
 
     console.log(

@@ -37,3 +37,6 @@ Thumbs.db
 
 # demo test residue
 examples/demo/big.txt
+
+# agent soul memory (user data, not repo content)
+**/.agent/

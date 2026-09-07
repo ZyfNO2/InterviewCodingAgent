@@ -11,6 +11,7 @@ import { createAskUserTool } from "./tools/ask-user.js";
 import { CliPermissionService } from "./core/permission.js";
 import { TraceRecorder } from "./core/trace.js";
 import { createSession } from "./core/session.js";
+import { MarkdownMemoryService, initSoul } from "./core/memory.js";
 import { prompt, closePrompt } from "./cli/prompt.js";
 import { parseArgs, readTaskInteractively, renderEvent } from "./cli/cli.js";
 
@@ -41,6 +42,7 @@ async function main(): Promise<void> {
   ctx.provide("llm", llm);
   ctx.provide("tools", tools);
   ctx.provide("permission", new CliPermissionService(prompt)); // Feature A：危险工具需人类批准
+  ctx.provide("memory", new MarkdownMemoryService(config.workspace)); // doc 10：Soul 长期记忆
 
   const trace = await TraceRecorder.create(process.cwd()); // 每次启动一个 run-*.jsonl
   console.log(`[trace] recording to ${trace.file}`);
@@ -63,6 +65,14 @@ async function main(): Promise<void> {
     }
 
     try {
+      // doc 10 B.4：/init 命令拦截，不作为任务丢给 LLM（Step 3 由 CommandRouter 统一收口）
+      if (currentTask.startsWith("/init")) {
+        const pref = currentTask.slice("/init".length).trim();
+        const memory = ctx.resolve<MarkdownMemoryService>("memory");
+        console.log(await initSoul(memory, pref || undefined));
+        currentTask = undefined;
+        continue;
+      }
       await agent.run(session, currentTask);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

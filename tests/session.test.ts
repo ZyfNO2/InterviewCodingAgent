@@ -147,7 +147,7 @@ describe("AgentSession（doc 09 Step1）", () => {
 
     const systemCount = session.messages.filter((m) => m.role === "system").length;
     assert.equal(systemCount, 1);
-    assert.equal(session.messages[0]!.role === "system" && session.messages[0].content, SYSTEM_PROMPT);
+    assert.equal(session.messages[0]?.role === "system" && session.messages[0]?.content, SYSTEM_PROMPT);
   });
 
   it("旧签名 run(task) 仍可用（过渡包装：临时 session，行为与之前一致）", async () => {

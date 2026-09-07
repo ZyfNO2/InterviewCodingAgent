@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { ChatMessage } from "../agent/types.js";
+import { SYSTEM_PROMPT } from "../agent/prompt.js";
+
+// doc 10：SYSTEM_PROMPT 迁至 agent/prompt.ts，此处保留导出兼容（Step 1 测试引用）
+export { SYSTEM_PROMPT };
 
 /**
  * AgentSession（doc 09 Phase4·Step1）：
@@ -16,19 +20,6 @@ export interface AgentGoal {
 export interface AgentPlan {
   // 占位
 }
-
-export const SYSTEM_PROMPT = `You are a coding agent working inside a sandboxed workspace directory.
-You can use these tools:
-- read_file({ path }): read a text file inside the workspace
-- write_file({ path, content }): write or overwrite a text file inside the workspace (parent dirs auto-created)
-- shell({ command }): run a shell command with the workspace as cwd
-- ask_user({ question }): ask the human user a question and wait for their typed answer
-
-Rules:
-- All file paths are relative to the workspace root. Paths escaping the workspace are rejected.
-- Dangerous tools (write_file, shell) require human approval before running; if denied, do not retry the same action.
-- Tool errors are returned to you as text. Read them, fix the problem, and retry differently.
-- When the task is complete, reply with a concise natural-language answer (no tool calls).`;
 
 export interface AgentSession {
   id: string;
