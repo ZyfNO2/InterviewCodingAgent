@@ -1,4 +1,4 @@
-import type { AgentConfig, ChatMessage, ToolCall } from "./types.js";
+import type { AgentConfig, ChatMessage, LLMResponse, ToolCall } from "./types.js";
 import { serializeToolCall } from "./types.js";
 import type { Context } from "../core/context.js";
 import { ToolRegistry } from "../tools/registry.js";
@@ -35,6 +35,7 @@ export class Agent {
   ) {}
 
   async run(task: string): Promise<AgentResult> {
+    this.onEvent?.({ type: "run_start", task, workspace: this.ctx.workspace });
     const messages: ChatMessage[] = [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: task },
@@ -42,6 +43,7 @@ export class Agent {
 
     for (let step = 1; step <= this.config.maxSteps; step++) {
       const res = await this.llm.chat(messages, this.tools.toLLMSchema());
+      this.onEvent?.({ type: "llm_call", step, request: messages, response: res });
 
       if (res.type === "final") {
         this.onEvent?.({ type: "final", step, text: res.text });
@@ -76,6 +78,8 @@ export class Agent {
 }
 
 export type AgentEvent =
+  | { type: "run_start"; task: string; workspace: string }
+  | { type: "llm_call"; step: number; request: ChatMessage[]; response: LLMResponse }
   | { type: "tool_call"; step: number; call: ToolCall }
   | { type: "tool_result"; step: number; call: ToolCall; result: { ok: boolean; output: string } }
   | { type: "batch"; step: number; calls: ToolCall[]; stats: { parallelGroups: number[]; sequential: number } }

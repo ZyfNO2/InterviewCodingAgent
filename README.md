@@ -66,6 +66,8 @@ npm start -- --workspace ./examples/demo --max-steps 20 "你的任务"
 - `--workspace <dir>`：Agent 工作根目录，默认 `process.cwd()`。所有文件工具被约束在该目录内，逃逸路径直接拒绝。
 - `--max-steps <n>`：Agent Loop 步数上限，默认 20，达到上限返回明确提示而非死循环。
 - 运行时打印每轮 tool 调用（名称 + 参数摘要）、tool 结果摘要、最终答案。
+- 每次启动自动在 `traces/run-<时间戳>.jsonl` 记录全量事件 Trace：任务、每步完整 LLM 请求（messages）/响应、每次 tool 调用与结果——可用于运行后审计与回放（`traces/` 已 gitignore）。
+- shell 工具输出自适应解码：严格 UTF-8 探测失败时回退 GBK（中文 Windows cmd），避免 `dir` 等命令中文乱码。
 
 ## 工具
 

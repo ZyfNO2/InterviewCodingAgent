@@ -9,6 +9,7 @@ import { writeFileTool } from "./tools/write-file.js";
 import { shellTool } from "./tools/shell.js";
 import { createAskUserTool } from "./tools/ask-user.js";
 import { CliPermissionService } from "./core/permission.js";
+import { TraceRecorder } from "./core/trace.js";
 import { prompt, closePrompt } from "./cli/prompt.js";
 import { parseArgs, readTaskInteractively, renderEvent } from "./cli/cli.js";
 
@@ -40,7 +41,14 @@ async function main(): Promise<void> {
   ctx.provide("tools", tools);
   ctx.provide("permission", new CliPermissionService(prompt)); // Feature A：危险工具需人类批准
 
-  const agent = new Agent(llm, tools, ctx, config, (event: AgentEvent) => renderEvent(event));
+  const trace = await TraceRecorder.create(process.cwd()); // 每次启动一个 run-*.jsonl
+  console.log(`[trace] recording to ${trace.file}`);
+
+  const agent = new Agent(llm, tools, ctx, config, async (event: AgentEvent) => {
+    renderEvent(event);
+    // Trace：全量事件（含 LLM 请求/响应）旁路写入 JSONL，不影响终端渲染
+    await trace.record({ ts: new Date().toISOString(), event });
+  });
 
   // 主循环：任务为空则继续交互读入
   let currentTask = task;

@@ -109,6 +109,22 @@ describe("shell", () => {
     assert.match(result.output, /--- stderr ---\nboom-stderr/);
   });
 
+  it("中文输出无乱码（GBK/UTF-8 自适应解码）", async () => {
+    const result = await shellTool.execute({ command: "echo 中文测试abc123" }, ctx);
+    assert.equal(result.ok, true);
+    assert.ok(
+      !result.output.includes("\uFFFD"),
+      `mojibake detected: ${JSON.stringify(result.output)}`,
+    );
+    if (result.output.includes("中文测试abc123")) {
+      // 在中文代码页机器上应完整还原
+      assert.match(result.output, /中文测试abc123/);
+    } else {
+      // 非 GBK 控制台下 cmd 可能输出 '?'，但至少不能是 UTF-8 误读的乱码
+      assert.match(result.output, /\?{4}abc123/);
+    }
+  });
+
   it("cwd 是 workspace", async () => {
     const result = await shellTool.execute(
       { command: 'node -e "console.log(process.cwd())"' },

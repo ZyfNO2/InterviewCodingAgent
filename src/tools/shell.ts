@@ -14,6 +14,23 @@ export const shellSchema = z.object({
   command: z.string().min(1).describe("Shell command to run in the workspace directory"),
 });
 
+/**
+ * 解码子进程输出：先用严格 UTF-8 探测，失败则回退 GBK
+ * （中文 Windows 的 cmd/OEM 代码页输出），再失败按 latin1 兜底。
+ */
+function decodeOutput(buffer: Buffer): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    /* 不是合法 UTF-8，继续尝试 */
+  }
+  try {
+    return new TextDecoder("gbk").decode(buffer);
+  } catch {
+    return buffer.toString("latin1");
+  }
+}
+
 export const shellTool: Tool = {
   name: "shell",
   description:
@@ -32,16 +49,24 @@ export const shellTool: Tool = {
         timeout: SHELL_TIMEOUT_MS,
         maxBuffer: 10 * 1024 * 1024,
         windowsHide: true,
+        encoding: "buffer",
       });
-      return { ok: true, output: formatShellResult(0, stdout, stderr) };
+      return {
+        ok: true,
+        output: formatShellResult(0, decodeOutput(stdout), decodeOutput(stderr)),
+      };
     } catch (err) {
-      const e = err as { stdout?: string; stderr?: string; code?: unknown };
+      const e = err as { stdout?: Buffer; stderr?: Buffer; code?: unknown };
       // 非零退出码也属于正常执行结果，回灌模型让其自我纠正
       if (typeof e.code !== "undefined" && (e.stdout !== undefined || e.stderr !== undefined)) {
         const exitCode = typeof e.code === "number" ? e.code : 1;
         return {
           ok: exitCode === 0,
-          output: formatShellResult(exitCode, e.stdout ?? "", e.stderr ?? ""),
+          output: formatShellResult(
+            exitCode,
+            decodeOutput(e.stdout ?? Buffer.alloc(0)),
+            decodeOutput(e.stderr ?? Buffer.alloc(0)),
+          ),
         };
       }
       return { ok: false, output: `shell failed: ${describeError(err)}` };
