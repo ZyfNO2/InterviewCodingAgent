@@ -16,6 +16,7 @@
       --accent-emerald: #10b981;
       --accent-amber: #f59e0b;
       --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
       --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
@@ -76,7 +77,8 @@
     .controls-top {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .control-group {
@@ -101,6 +103,28 @@
       border-color: var(--accent-blue);
     }
 
+    /* 会话状态条 */
+    .session-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #111d33;
+      border: 1px solid #1e3a5f;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .session-id {
+      color: var(--accent-blue);
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .session-turns {
+      color: var(--text-muted);
+    }
+
     .status-badge {
       font-size: 12px;
       font-weight: 600;
@@ -122,6 +146,52 @@
       50% { opacity: 0.6; }
     }
 
+    /* Soul 折叠侧栏/顶部条 */
+    .soul-bar {
+      background: #192237;
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 24px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+      transition: background-color 0.3s ease;
+    }
+
+    .soul-bar.updated-flash {
+      background: #2e1065;
+      animation: flash 1s ease;
+    }
+
+    @keyframes flash {
+      0% { background-color: #581c87; }
+      100% { background-color: #192237; }
+    }
+
+    .soul-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .soul-icon {
+      font-size: 14px;
+    }
+
+    .soul-label {
+      font-weight: 600;
+      color: var(--accent-purple);
+    }
+
+    .soul-summary-text {
+      color: #e2e8f0;
+      max-width: 700px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* 主容器 */
     main {
       flex: 1;
@@ -132,7 +202,7 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
-      margin-bottom: 120px;
+      margin-bottom: 140px;
     }
 
     /* 空状态 */
@@ -190,6 +260,30 @@
     .time {
       font-size: 11px;
       color: var(--text-muted);
+    }
+
+    /* 轮次与会话分隔条 */
+    .turn-divider {
+      display: flex;
+      align-items: center;
+      margin: 12px 0;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .turn-divider::before,
+    .turn-divider::after {
+      content: "";
+      flex: 1;
+      border-bottom: 1px dashed var(--border-color);
+    }
+
+    .turn-divider span {
+      padding: 0 10px;
+      font-weight: 600;
+      color: var(--accent-blue);
     }
 
     /* 用户与助手消息 */
@@ -340,6 +434,11 @@
       color: #e0f2fe;
     }
 
+    .ask-badge.plan_approval {
+      background: #7c2d12;
+      color: #ffedd5;
+    }
+
     .ask-question {
       font-size: 15px;
       font-weight: 600;
@@ -351,9 +450,10 @@
       display: flex;
       gap: 10px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
-    .ask-form input {
+    .ask-form input, .ask-form textarea {
       flex: 1;
       padding: 8px 12px;
     }
@@ -368,6 +468,140 @@
     .reply-tag.approved { background: #065f46; color: #a7f3d0; }
     .reply-tag.rejected { background: #881337; color: #fecdd3; }
     .reply-tag.answered { background: #075985; color: #bae6fd; }
+    .reply-tag.revised { background: #1e3a8a; color: #bfdbfe; }
+
+    /* ── Phase 4 Step 2: Command 系统通知卡 ── */
+    .command-card {
+      border-left: 4px solid var(--accent-blue);
+      background: #132238;
+    }
+
+    .command-title {
+      font-weight: 600;
+      color: var(--accent-blue);
+    }
+
+    /* ── Phase 4 Step 3: Goal & Plan 结构化卡片 ── */
+    .goal-card {
+      border: 1px solid #0369a1;
+      border-left: 4px solid var(--accent-blue);
+      background: #0c2340;
+    }
+
+    .goal-title {
+      font-weight: 700;
+      color: var(--accent-blue);
+    }
+
+    .goal-criteria-list {
+      list-style: none;
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .goal-criteria-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+
+    .goal-check-icon {
+      color: var(--accent-emerald);
+      font-weight: bold;
+    }
+
+    .plan-card {
+      border: 1px solid #3b82f6;
+      border-left: 4px solid #60a5fa;
+      background: #172554;
+    }
+
+    .plan-header-status {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .plan-status-proposed { background: #78350f; color: #fde68a; }
+    .plan-status-approved { background: #064e3b; color: #6ee7b7; }
+    .plan-status-rejected { background: #7f1d1d; color: #fca5a5; }
+    .plan-status-revised { background: #1e3a8a; color: #93c5fd; }
+
+    .plan-frozen-warning {
+      background: #451a03;
+      border: 1px solid #d97706;
+      color: #fef3c7;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .plan-steps-list {
+      list-style-position: inside;
+      margin: 8px 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .plan-risks-box {
+      margin-top: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      border-left: 3px solid var(--accent-amber);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #fde68a;
+    }
+
+    .illegal-side-effect-alert {
+      border: 2px solid #ef4444 !important;
+      background: #450a0a !important;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    /* ── Phase 4 Step 4/5/6: Runtime Status (Completion, Stall, Early Stop) ── */
+    .completion-card {
+      border-left: 4px solid var(--accent-amber);
+      background: #25241f;
+    }
+
+    .completion-card.verified {
+      border-left: 4px solid var(--accent-emerald);
+      background: #142e26;
+    }
+
+    .stall-warning-card {
+      border-left: 4px solid var(--accent-amber);
+      background: #422006;
+      color: #fef08a;
+    }
+
+    .early-stop-card {
+      border: 2px solid var(--accent-rose);
+      background: #450a0a;
+    }
+
+    .soul-toast-card {
+      border-left: 4px solid var(--accent-purple);
+      background: #2e1065;
+      color: #e9d5ff;
+    }
 
     /* 完成 Done */
     .done-card {
@@ -415,12 +649,34 @@
       margin: 0 auto;
       display: flex;
       gap: 12px;
+      position: relative;
+    }
+
+    .command-badge {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--accent-purple);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: none;
     }
 
     .task-input {
       flex: 1;
       padding: 10px 16px;
       font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .task-input.command-mode {
+      padding-left: 80px;
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 0 1px var(--accent-purple);
     }
 
     .btn {
@@ -467,6 +723,15 @@
     .btn-secondary:hover:not(:disabled) {
       background: #475569;
     }
+
+    .btn-warning {
+      background: #d97706;
+      color: white;
+    }
+
+    .btn-warning:hover:not(:disabled) {
+      background: #b45309;
+    }
   </style>
 </head>
 <body>
@@ -475,10 +740,19 @@
     <div class="brand">
       <span class="brand-icon">⚡</span>
       <span class="brand-title">Coding Agent WebUI</span>
-      <span class="brand-tag">Phase 4 (P2)</span>
+      <span class="brand-tag">Phase 4 Full</span>
     </div>
 
     <div class="controls-top">
+      <!-- 会话条 -->
+      <div class="session-bar" id="session-bar">
+        <span>Session:</span>
+        <select id="session-select" title="切换会话" style="max-width: 160px;"></select>
+        <span class="session-id" id="session-id-display">sess-default</span>
+        <span class="session-turns" id="session-turn-display">(Turn 1)</span>
+      </div>
+      <button id="new-session-btn" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">+ 新建会话</button>
+
       <div class="control-group">
         <label for="source-mode">模式:</label>
         <select id="source-mode">
@@ -490,15 +764,35 @@
       <div class="control-group" id="scenario-container">
         <label for="scenario-select">剧本:</label>
         <select id="scenario-select">
-          <option value="case1">Case 1: 读取分析代码</option>
-          <option value="case2">Case 2: 写入/Shell/权限审批</option>
-          <option value="case3">Case 3: 异常与自我纠错</option>
+          <optgroup label="基础基线">
+            <option value="case1">Case 1: 读取分析代码</option>
+            <option value="case2">Case 2: 写入/Shell/权限审批</option>
+            <option value="case3">Case 3: 异常与自我纠错</option>
+          </optgroup>
+          <optgroup label="Step 1: Session 连续对话 & 隔离">
+            <option value="session_case1">Session Case 1: 连续多轮记忆 (引用上一轮产物)</option>
+            <option value="session_iso">Session Case 2: 会话隔离演示</option>
+          </optgroup>
+          <optgroup label="Step 2: Soul & 命令">
+            <option value="soul_init">Soul Case 1: /init 建立人设偏好</option>
+            <option value="soul_effect">Soul Case 2: Soul 偏好影响代码行为</option>
+          </optgroup>
+          <optgroup label="Step 3: Plan & Goal 审批 Gate">
+            <option value="plan_approve">Plan Case 1: 计划提出与 Approve 批准执行</option>
+            <option value="plan_reject">Plan Case 2: 计划 Reject 驳回 (无副作用)</option>
+            <option value="plan_revise">Plan Case 3: 计划 Revise 修改建议重排</option>
+          </optgroup>
+          <optgroup label="Step 4/5/6: 运行时状态">
+            <option value="completion_gate">Step 4: Completion 未达标驳回与补做</option>
+            <option value="early_stop_stall">Step 5: 停滞重复与 Early Stop 熔断</option>
+            <option value="memory_consolidate">Step 6: 会话沉淀为长期 Soul 记忆</option>
+          </optgroup>
         </select>
       </div>
 
       <div class="control-group" id="backend-url-container" style="display: none;">
         <label for="backend-url">服务地址:</label>
-        <input type="text" id="backend-url" value="http://localhost:3000" style="width: 170px;">
+        <input type="text" id="backend-url" value="http://localhost:8046" style="width: 170px;">
       </div>
 
       <span id="status-badge" class="status-badge info">Ready</span>
@@ -506,13 +800,23 @@
     </div>
   </header>
 
+  <!-- Soul 人设状态展示条（可折叠） -->
+  <div class="soul-bar" id="soul-bar">
+    <div class="soul-left">
+      <span class="soul-icon">🧠</span>
+      <span class="soul-label">SOUL / Memory:</span>
+      <span class="soul-summary-text" id="soul-summary">未载入长期人设 (使用 /init 初始化或等待系统载入)</span>
+    </div>
+    <span style="font-size: 11px; opacity: 0.7;">.agent/SOUL.md</span>
+  </div>
+
   <!-- 中间事件卡片流 -->
   <main>
     <div id="empty-state" class="empty-state">
       <div class="empty-icon">💬</div>
       <h2>准备就绪</h2>
       <p>在底部输入任务并点击“发送任务”启动 Agent 事件流。</p>
-      <p style="font-size: 12px; color: #64748b;">支持通过顶部下拉框切换测试剧本 (Case 1 / Case 2 / Case 3)。</p>
+      <p style="font-size: 12px; color: #64748b;">支持通过顶部剧本切换体验 Phase 4 全套能力（Session、Soul、/init、/plan 审批、Completion Gate、早停与记忆沉淀）。</p>
     </div>
 
     <div id="events-list" class="events-list"></div>
@@ -521,7 +825,8 @@
   <!-- 底部任务输入控制栏 -->
   <footer>
     <div class="input-bar">
-      <input type="text" id="task-input" class="task-input" placeholder="输入 Agent 任务..." />
+      <span id="command-badge" class="command-badge">COMMAND</span>
+      <input type="text" id="task-input" class="task-input" placeholder="输入 Agent 任务，或输入 /init、/plan 等斜杠命令..." />
       <button id="send-btn" class="btn btn-primary">
         <span>🚀 发送任务</span>
       </button>

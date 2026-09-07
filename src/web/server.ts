@@ -88,6 +88,19 @@ function translateAgentEvent(e: AgentEvent, task: string): ContractEvent | null 
         ok: e.result.ok,
         result: e.result.output,
       };
+    case "session_start":
+      return { type: "session_start", sessionId: e.sessionId };
+    case "session_turn":
+      return { type: "session_turn", sessionId: e.sessionId, turn: e.userTurns };
+    case "memory_loaded":
+      return {
+        type: "soul",
+        action: "loaded",
+        summary:
+          e.soulChars > 0
+            ? `Soul loaded: ${e.soulChars} chars injected into stable prefix.`
+            : "No SOUL.md found — running without persistent memory.",
+      };
     case "final":
       return { type: "done", text: e.text };
     case "max_steps_reached":

@@ -1,32 +1,58 @@
 # Minimal Coding Agent
 
-DSH-inspired **Minimal Agent Runtime**（不是 Mini DeepSeek Harness）——提取 DSH 的核心工程思想（Context / Registry / Agent Loop），压缩到笔试最小规模的一个多轮 Tool Calling Coding Agent。
+DSH-inspired **Minimal Agent Runtime**（不是 Mini DeepSeek Harness）——提取 DSH 的核心工程思想（Context / Registry / Agent Loop），压缩到生产级极简规模的多轮 Tool Calling Coding Agent。
+
+![Minimal Coding Agent 演进架构与落地全景图](docs/architecture_archify.png)
+> 💡 交互式架构图网页可直接在浏览器打开：[`docs/architecture.html`](docs/architecture.html)（支持深/浅色主题、矢量缩放、视角过滤、聚焦高亮与拓扑连线）。
+
+---
+
+## 架构演进与落地边界
+
+系统严格遵循 **控制策略与环境能力解耦** 的工程原则，将能力划分为三大明确的生命周期状态：
+
+| 状态分类 | 包含模块 / 规约位置 | 落地现状说明 |
+| :--- | :--- | :--- |
+| **● 已实现 (Implemented Baseline)** | **AgentLoop** (`agent/agent.ts`)<br>**Context DI** (`core/context.ts`)<br>**LLMProvider** (`llm/provider.ts`)<br>**ToolRegistry** (`tools/registry.ts`)<br>**PermissionService** (`core/permission.ts`)<br>**4项工具** (`read`/`write`/`shell`/`ask`)<br>**TraceRecorder** (`core/trace.ts`)<br>**Tool Result 截断** (`core/context-manager.ts`) | **完整交付并闭环**：<br>• Thought → Action → Observation 状态跃迁与 maxSteps 兜底<br>• 极简 DI 依赖注入与路径牢笼安全校验（防 `../` 逃逸）<br>• 危险命令审批（[y/N] 拦截卡点与 fail-closed 保护）<br>• 批调度（连续 parallelSafe 工具分组并发与按序提交）<br>• 原始全量事件旁路落盘（`run-*.jsonl`）与超长结果截断（保留头70%+尾30%） |
+| **○ 规划中 (In Plan 文件夹)** | **WebUI / SSE 演示层** (`Plan/04` & `Plan/06`)<br>**历史压缩与 Token 预算** (`Plan/07`)<br>**有限并发执行池** (`Plan/07`) | **设计规约已就绪**：<br>• 前端 React + Tailwind Mock 脚手架已就绪，通过 SSE 广播契约事件<br>• `ContextManager.compact()` 消息对成对压缩机制<br>• Bounded Concurrency Pool 信号量控制（如并发数 ≤ 4） |
+| **⚠ 待更新 (Not in Plan 文件夹)** | **Soul.md 自我沉淀** (Hermes 提示词注入)<br>**Context Memory / KV 稳定**<br>**Session 会话隔离**<br>**Subagent / Team 协作系统** | **非 Plan 探索方向**：<br>• 尚未在项目 `Plan/` 文件夹中建立 SPEC 与验收标准的外部探索特性 |
+
+---
+
+## 核心架构拓扑
 
 ```text
-DSH / Pi Agent
-      ↓  提取核心工程思想
-Context / Registry / Agent Loop
-      ↓
-Minimal Coding Agent
-```
-
-## 架构
-
-```text
-        ┌──────────────┐
-        │     CLI      │  参数解析 / readline / 事件渲染
-        └──────┬───────┘
-        ┌─────▼─────┐
-        │ AgentLoop │  控制策略（模型调用 + 状态推进）
-        └─────┬─────┘
-           Context / DI
-       ┌───────┼─────────┐
-       ▼       ▼         ▼
-      LLM    Tools    (Permission, 阶段二)
-               │
-     ┌─────────┼─────────┐
-     ▼         ▼         ▼
- read_file  write_file  shell
+                               ┌─────────────────┐
+                               │  Context DI 容器 │ (已实现)
+                               └────────┬────────┘
+                                        │ 依赖注入
+                               ┌────────▼────────┐    chat() 协议    ┌──────────────────┐
+  CLI 终端驱动  ───────────────►│    AgentLoop    ├─────────────────►│ LLMProvider 适配 │ (已实现)
+  (已实现)         run(task)    │   状态机引擎    │                  └──────────────────┘
+                               └────────┬────────┘
+  WebUI 演示层  ···············►         │
+  (规划中 Plan)    SSE 交互              ├───────────────────────────────┐
+                                        │ executeBatch (批处理)         │ 上下文截断 / 维护
+                               ┌────────▼────────┐             ┌────────▼────────┐
+                               │  ToolRegistry   │             │ ContextManager  │ (截断已实现 /
+                               │   能力调度器    │ (已实现)     │ 上下文管理器    │  压缩规划中)
+                               └───┬─────────┬───┘             └───┬─────────┬───┘
+                                   │         │ 批次分派            │         │
+                 安全拦截          │         │ (规划中 Plan)       │         │ 多轮隔离
+       ┌───────────────────────────┘         │                     │         ▼ (待更新 非Plan)
+       ▼                                     ▼                     │  ┌──────────────────┐
+┌──────────────┐ 放行执行 ┌──────────────┐ ┌──────────────┐       │  │ Session 会话隔离 │
+│  Permission  ├─────────►│  核心4项工具 │ │ 有限并发池   │       │  └──────────────────┘
+│  安全审批    │          │ read/write/  │ │ Bounded Pool │       │
+│  (已实现)    │          │ shell/ask    │ └──────────────┘       │  ┌──────────────────┐
+└──────────────┘          └──────┬───────┘                        ├─►│ Subagent / Team  │ (待更新 非Plan)
+                                 │ 事件落盘                       │  └──────────────────┘
+                                 ▼                                │
+                        ┌──────────────────┐ 完整事实留存         │  ┌──────────────────┐
+                        │  TraceRecorder   │◄─────────────────────┘  │ Soul.md 人设沉淀 │ (待更新 非Plan)
+                        │  run-*.jsonl 事实│ (已实现)                └─────────┬────────┘
+                        └──────────────────┘                                   │ 提示词反思注入
+                                                                               └────────────────► (待更新)
 ```
 
 角色划分：
@@ -34,9 +60,12 @@ Minimal Coding Agent
 | 组件 | 职责 |
 | --- | --- |
 | `AgentLoop` | 控制策略（模型调用 + 状态推进），带 `maxSteps` 兜底 |
-| `Context` | Runtime 依赖容器（极简 DI，约定注入键 `"llm"` / `"tools"`） |
-| `ToolRegistry` | Tool 能力注册、查找、导出 LLM schema、统一执行入口 |
+| `Context` | Runtime 依赖容器（极简 DI，约定注入键 `"llm"` / `"tools"` / `"permission"`） |
+| `ToolRegistry` | Tool 能力注册、查找、导出 LLM schema、批调度与统一执行入口 |
 | `Tool` | Agent 与环境之间的 Action（zod 入参 schema + `execute`） |
+| `PermissionService` | 安全防护卡点（safe 免批放行 vs dangerous 人类审批） |
+| `ContextManager` | 上下文截断保护（Trace 保留完整事实，Context 智能截断保留关键头尾） |
+| `TraceRecorder` | 事实可观测性（每轮 Run 全量异步写入 `run-*.jsonl` 供回溯审计） |
 
 ## 安装与配置
 

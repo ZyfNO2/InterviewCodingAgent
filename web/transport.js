@@ -36,7 +36,61 @@
  * @property {'error'} type
  * @property {string} message
  *
- * @typedef {AgentEventMessage | AgentEventToolCall | AgentEventToolResult | AgentEventAsk | AgentEventDone | AgentEventError} AgentEvent
+ * // —— Phase 4 增量事件契约 ——
+ * @typedef {Object} AgentEventSessionStart
+ * @property {'session_start'} type
+ * @property {string} sessionId
+ * @property {string} [title]
+ *
+ * @typedef {Object} AgentEventSessionTurn
+ * @property {'session_turn'} type
+ * @property {string} sessionId
+ * @property {number} turn
+ *
+ * @typedef {Object} AgentEventSession
+ * @property {'session'} type
+ * @property {string} sessionId
+ * @property {number} userTurns
+ *
+ * @typedef {Object} AgentEventSoul
+ * @property {'soul'} type
+ * @property {'loaded' | 'updated' | 'consolidated'} action
+ * @property {string} summary
+ *
+ * @typedef {Object} AgentEventCommand
+ * @property {'command'} type
+ * @property {'init' | 'plan'} command
+ * @property {boolean} accepted
+ * @property {string} [note]
+ *
+ * @typedef {Object} AgentEventGoal
+ * @property {'goal'} type
+ * @property {string} description
+ * @property {string[]} acceptanceCriteria
+ *
+ * @typedef {Object} AgentEventPlan
+ * @property {'plan'} type
+ * @property {string[]} steps
+ * @property {string[]} [risks]
+ * @property {'proposed' | 'approved' | 'rejected' | 'revised'} status
+ *
+ * @typedef {Object} AgentEventCompletionCheck
+ * @property {'completion_check'} type
+ * @property {boolean} complete
+ * @property {string} [reason]
+ * @property {string[]} [remaining]
+ * @property {number} attempt
+ *
+ * @typedef {Object} AgentEventStallWarning
+ * @property {'stall_warning'} type
+ * @property {number} round
+ *
+ * @typedef {Object} AgentEventEarlyStop
+ * @property {'early_stop'} type
+ * @property {'stalled' | 'completion_check_limit' | 'max_steps'} stopReason
+ * @property {string} [detail]
+ *
+ * @typedef {AgentEventMessage | AgentEventToolCall | AgentEventToolResult | AgentEventAsk | AgentEventDone | AgentEventError | AgentEventSessionStart | AgentEventSessionTurn | AgentEventSession | AgentEventSoul | AgentEventCommand | AgentEventGoal | AgentEventPlan | AgentEventCompletionCheck | AgentEventStallWarning | AgentEventEarlyStop} AgentEvent
  */
 
 /**
@@ -50,7 +104,13 @@
  * @property {string} id
  * @property {boolean} approved
  *
- * @typedef {AgentReplyAnswer | AgentReplyApprove} AgentReply
+ * @typedef {Object} AgentReplyPlanDecision
+ * @property {'plan_decision'} type
+ * @property {string} id
+ * @property {'approve' | 'reject' | 'revise'} decision
+ * @property {string} [note]
+ *
+ * @typedef {AgentReplyAnswer | AgentReplyApprove | AgentReplyPlanDecision} AgentReply
  */
 
 /**
@@ -84,7 +144,7 @@ export class BaseEventSource {
    * 启动任务
    * @param {string} task
    */
-  start(task) {
+  start(task, sessionId) {
     throw new Error('start() not implemented');
   }
 
@@ -119,6 +179,17 @@ export class MockEventSource extends BaseEventSource {
     this.timeoutId = null;
     /** @type {((reply: AgentReply) => void) | null} */
     this.pendingReplyResolver = null;
+    this.currentSessionId = 'sess-mock-default';
+    this.turnCounter = 0;
+  }
+
+  /**
+   * 设置会话 ID
+   * @param {string} sessionId
+   */
+  setSession(sessionId) {
+    this.currentSessionId = sessionId;
+    this.turnCounter = 0;
   }
 
   /**
@@ -131,9 +202,14 @@ export class MockEventSource extends BaseEventSource {
     }
   }
 
-  async start(task) {
+  async start(task, sessionId) {
     this.stop();
     this.running = true;
+
+    if (sessionId) {
+      this.currentSessionId = sessionId;
+    }
+    this.turnCounter++;
 
     // 先发送一条用户消息
     this.emit({
@@ -149,7 +225,10 @@ export class MockEventSource extends BaseEventSource {
       return;
     }
 
-    const script = scenarioGenerator(task);
+    // 支持生成器/函数传递上下文
+    const script = typeof scenarioGenerator === 'function'
+      ? scenarioGenerator(task, { sessionId: this.currentSessionId, turn: this.turnCounter })
+      : scenarioGenerator;
 
     try {
       for (const item of script) {
@@ -195,6 +274,38 @@ export class MockEventSource extends BaseEventSource {
               role: 'user',
               content: `[用户回复]: ${reply.value}`,
             });
+          } else if (reply.type === 'plan_decision') {
+            // Plan 决策回复 (approve / reject / revise)
+            if (reply.decision === 'approve') {
+              this.emit({
+                type: 'plan',
+                status: 'approved',
+                steps: item.steps || ['1. 执行计划步骤'],
+              });
+            } else if (reply.decision === 'reject') {
+              this.emit({
+                type: 'plan',
+                status: 'rejected',
+                steps: item.steps || ['1. 执行计划步骤'],
+              });
+              this.emit({
+                type: 'done',
+                text: 'Plan rejected, no changes made. (计划已被驳回，未执行任何副作用操作)',
+              });
+              break;
+            } else if (reply.decision === 'revise') {
+              this.emit({
+                type: 'message',
+                role: 'user',
+                content: `[修改建议]: ${reply.note || '请调整步骤'}`,
+              });
+              this.emit({
+                type: 'plan',
+                status: 'revised',
+                steps: ['1. 根据修改建议重构步骤 (Revised)', '2. 执行并验证'],
+                risks: ['已规避修改意见中提到的风险'],
+              });
+            }
           }
         }
       }
@@ -240,9 +351,10 @@ export class SseEventSource extends BaseEventSource {
     this.eventSource = null;
   }
 
-  start(task) {
+  start(task, sessionId) {
     this.stop();
-    const url = `${this.baseUrl}/api/run?task=${encodeURIComponent(task)}`;
+    const sessionParam = sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : '';
+    const url = `${this.baseUrl}/api/run?task=${encodeURIComponent(task)}${sessionParam}`;
     this.eventSource = new window.EventSource(url);
 
     this.eventSource.onmessage = (e) => {
