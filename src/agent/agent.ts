@@ -2,6 +2,7 @@ import type { AgentConfig, ChatMessage, LLMResponse, ToolCall } from "./types.js
 import { serializeToolCall } from "./types.js";
 import type { Context } from "../core/context.js";
 import { ToolRegistry } from "../tools/registry.js";
+import { resolveToolResultCharLimit, truncateToolResultOutput } from "../core/context-manager.js";
 import type { LLMProvider } from "../llm/provider.js";
 
 export const SYSTEM_PROMPT = `You are a coding agent working inside a sandboxed workspace directory.
@@ -63,11 +64,15 @@ export class Agent {
       }
 
       const results = await this.tools.executeBatch(res.calls, this.ctx);
+      // Tool Result 截断（doc 07 二）：完整版照旧经 tool_result 事件进 Trace，截断版入 Context
+      const charLimit = resolveToolResultCharLimit(this.config);
       for (let i = 0; i < res.calls.length; i++) {
         const call = res.calls[i]!;
         const result = results[i]!;
         this.onEvent?.({ type: "tool_result", step, call, result });
-        messages.push({ role: "tool", tool_call_id: call.id, content: result.output });
+        const { contextText } = truncateToolResultOutput(result.output, charLimit);
+        // 只变换 content 字符串，不增删消息，tool_call/tool_result 配对始终完整
+        messages.push({ role: "tool", tool_call_id: call.id, content: contextText });
       }
     }
 

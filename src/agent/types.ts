@@ -52,6 +52,12 @@ export interface AgentConfig {
   apiKey: string;
   baseUrl?: string;
   model: string;
+  /**
+   * 单个 tool result 进入 Context 的最大字符数（doc 07 二·Tool Result 截断）。
+   * 超限时保留头尾并标注"完整内容见 trace"；完整结果始终先经 tool_result 事件进 Trace。
+   * 0 = 关闭截断（回退原始行为）；未配置 = 10000。
+   */
+  toolResultCharLimit?: number;
 }
 
 import type { ZodTypeAny } from "zod";

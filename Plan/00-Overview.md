@@ -16,6 +16,7 @@
 | `04-Phase4-WebUI.md` | 阶段四 (可选 P2) | WebUI 演示层（前端，Mock 优先，可并行） |
 | `05-LLM-Config.md` | 配置附录 | LLM 端点 / 模型 / 环境变量约定 |
 | `06-Integration-WebUI-Backend.md` | 接线阶段 (可选) | 前端 ↔ 后端 Runtime 端到端联调 |
+| `07-Concurrency-Context-Design.md` | 进阶设计 (可选) | 有限并发执行池 + Context 管理（非长期 Memory） |
 
 ## 技术故事定位
 
