@@ -23,7 +23,7 @@
         "id": "tool-execution",
         "label": "工具执行与沙箱约束",
         "focus": ["registry", "tools_fs", "tool_shell", "guard", "workspace"],
-        "note": "工具经由权限门禁与路径逃逸校验，在本地受控 Workspace 中安全执行。"
+        "note": "工具经由权限门禁与路径逃逸校验，在受控 Workspace 中安全执行。"
       }
     ]
   },
@@ -31,68 +31,68 @@
     {
       "id": "cli",
       "type": "frontend",
-      "label": "CLI 交互终端",
+      "label": "CLI 终端",
       "sublabel": "readline / 参数解析",
       "pos": [40, 240],
-      "size": [130, 60]
+      "size": [110, 56]
     },
     {
       "id": "loop",
       "type": "backend",
-      "label": "Agent Loop 核心",
-      "sublabel": "maxSteps / 状态推进",
+      "label": "Agent Loop",
+      "sublabel": "maxSteps / 状态机",
       "tag": "调度中枢",
-      "pos": [240, 240],
-      "size": [140, 64]
+      "pos": [200, 240],
+      "size": [120, 60]
     },
     {
       "id": "llm",
       "type": "cloud",
-      "label": "LLM 接口服务",
-      "sublabel": "OpenAI Compatible API",
+      "label": "LLM Provider",
+      "sublabel": "OpenAI Compatible",
       "tag": "Tool Calling",
-      "pos": [240, 80],
-      "size": [140, 60]
+      "pos": [200, 80],
+      "size": [120, 56]
     },
     {
       "id": "ctx",
       "type": "backend",
       "label": "Runtime Context",
-      "sublabel": "依赖注入 / Service Container",
-      "pos": [450, 240],
-      "size": [150, 60]
+      "sublabel": "DI / 服务容器",
+      "pos": [370, 240],
+      "size": [130, 56]
     },
     {
       "id": "registry",
       "type": "backend",
       "label": "Tool Registry",
-      "sublabel": "Schema 导出 / 路由寻址",
-      "pos": [670, 240],
-      "size": [140, 60]
+      "sublabel": "Schema / 路由",
+      "pos": [550, 240],
+      "size": [120, 56]
     },
     {
       "id": "tools_fs",
       "type": "backend",
       "label": "FS Tools",
-      "sublabel": "read_file / write_file",
-      "pos": [880, 150],
-      "size": [130, 60]
+      "sublabel": "read / write",
+      "pos": [720, 130],
+      "size": [110, 56]
     },
     {
       "id": "tool_shell",
       "type": "backend",
       "label": "Shell Tool",
-      "sublabel": "子进程执行 / 捕获输出",
-      "pos": [880, 240],
-      "size": [130, 60]
+      "sublabel": "子进程命令执行",
+      "pos": [720, 240],
+      "size": [110, 56]
     },
     {
       "id": "guard",
       "type": "security",
       "label": "Permission 门禁",
-      "sublabel": "ask_user / 高危拦截",
-      "pos": [880, 330],
-      "size": [130, 60]
+      "sublabel": "ask_user / 拦截",
+      "pos": [720, 350],
+      "size": [110, 56]
     },
     {
       "id": "workspace",
@@ -100,8 +100,8 @@
       "label": "Workspace 沙箱",
       "sublabel": "受限工作区文件系统",
       "tag": "防路径逃逸",
-      "pos": [1080, 210],
-      "size": [140, 64]
+      "pos": [910, 130],
+      "size": [130, 60]
     }
   ],
   "boundaries": [
@@ -109,11 +109,6 @@
       "kind": "region",
       "label": "Agent Runtime 进程边界 (Node.js / TS)",
       "wraps": ["loop", "ctx", "registry", "tools_fs", "tool_shell", "guard"]
-    },
-    {
-      "kind": "security-group",
-      "label": "工作区隔离边界",
-      "wraps": ["workspace"]
     }
   ],
   "connections": [
@@ -146,32 +141,38 @@
       "id": "registry-to-fs",
       "from": "registry",
       "to": "tools_fs",
-      "label": "执行文件调用"
+      "fromSide": "top",
+      "toSide": "left"
     },
     {
       "id": "registry-to-shell",
       "from": "registry",
-      "to": "tool_shell",
-      "label": "执行命令调用"
+      "to": "tool_shell"
     },
     {
       "id": "registry-to-guard",
       "from": "registry",
       "to": "guard",
       "label": "权限核验",
-      "variant": "security"
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "left"
     },
     {
       "id": "fs-to-workspace",
       "from": "tools_fs",
       "to": "workspace",
-      "label": "文件读写"
+      "label": "文件读写",
+      "fromSide": "right",
+      "toSide": "left"
     },
     {
       "id": "shell-to-workspace",
       "from": "tool_shell",
       "to": "workspace",
-      "label": "沙箱执行"
+      "label": "沙箱执行",
+      "fromSide": "right",
+      "toSide": "bottom"
     }
   ],
   "cards": [

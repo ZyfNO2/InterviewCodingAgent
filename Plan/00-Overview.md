@@ -13,8 +13,9 @@
 | `01-Phase1-Minimal-Runtime.md` | 阶段一 (P0) | 最小可运行 Coding Agent Runtime |
 | `02-Phase2-Extensions.md` | 阶段二 | Permission / ask_user / Parallel Tool |
 | `03-Phase3-Testing-Delivery.md` | 阶段三 | 测试、验证与最终交付 |
-| `04-Phase4-WebUI.md` | 阶段四 (可选 P2) | WebUI 演示层 |
+| `04-Phase4-WebUI.md` | 阶段四 (可选 P2) | WebUI 演示层（前端，Mock 优先，可并行） |
 | `05-LLM-Config.md` | 配置附录 | LLM 端点 / 模型 / 环境变量约定 |
+| `06-Integration-WebUI-Backend.md` | 接线阶段 (可选) | 前端 ↔ 后端 Runtime 端到端联调 |
 
 ## 技术故事定位
 
