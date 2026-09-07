@@ -251,10 +251,28 @@ const server = http.createServer(async (req, res) => {
       agentSessions.set(agentSession.id, agentSession);
     }
 
-    // doc 10 B.4：/init 命令在 Web 入口同样拦截，不作为任务丢给 LLM
+    // doc 10 B.4：/init 命令在 Web 入口同样拦截，不作为任务丢给 LLM。
+    // content 经 LLM 策展（增量合并/冲突改写）后才写入 SOUL.md。
     if (task.startsWith("/init")) {
+      const apiKey = process.env.OPENAI_API_KEY;
       const memory = new MarkdownMemoryService(workspaceAbs);
-      const reply = await initSoul(memory, task.slice("/init".length).trim() || undefined);
+      let reply: string;
+      if (!apiKey) {
+        reply = "Soul update failed: OPENAI_API_KEY is not set; SOUL.md left unchanged.";
+      } else {
+        const llm = new LLMProvider({
+          workspace: workspaceAbs,
+          maxSteps,
+          apiKey,
+          baseUrl: process.env.OPENAI_BASE_URL || undefined,
+          model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        });
+        try {
+          reply = await initSoul(memory, llm, task.slice("/init".length).trim() || undefined);
+        } catch (err) {
+          reply = `Soul update failed: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      }
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",

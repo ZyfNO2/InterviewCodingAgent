@@ -69,10 +69,20 @@ describe("MarkdownMemoryService", () => {
   });
 });
 
+/** /init LLM 策展路径的 Mock：返回预设的"合并后 SOUL.md" */
+function makeMergeLLM(mergedOutput: string, onMessages?: (m: ChatMessage[]) => void): LLMProvider {
+  return {
+    chat: async (messages: ChatMessage[]) => {
+      onMessages?.(structuredClone(messages));
+      return { type: "final", text: mergedOutput };
+    },
+  } as unknown as LLMProvider;
+}
+
 describe("/init 命令语义", () => {
-  it("/init：Soul 不存在 → 用模板创建", async () => {
+  it("/init：Soul 不存在 → 用模板创建（无内容，不走 LLM）", async () => {
     const memory = makeMemory(await freshWorkspace());
-    const reply = await initSoul(memory);
+    const reply = await initSoul(memory, makeMergeLLM("SHOULD-NOT-BE-CALLED"));
     assert.match(reply, /created from template/);
     assert.equal(await memory.loadSoul(), SOUL_TEMPLATE);
   });
@@ -80,27 +90,68 @@ describe("/init 命令语义", () => {
   it("/init 已存在且无参数 → 提示已存在，不覆盖", async () => {
     const memory = makeMemory(await freshWorkspace());
     await memory.saveSoul("custom soul content");
-    const reply = await initSoul(memory);
+    const reply = await initSoul(memory, makeMergeLLM("SHOULD-NOT-BE-CALLED"));
     assert.match(reply, /already exists/);
     assert.equal(await memory.loadSoul(), "custom soul content");
   });
 
-  it("/init <pref>：创建并写入初始偏好到 User Preferences 段", async () => {
+  it("/init <content>：经 LLM 策展后写入（不直接追加），LLM 收到现有内容与新输入", async () => {
     const memory = makeMemory(await freshWorkspace());
-    const reply = await initSoul(memory, "Prefer TypeScript over Python.");
-    assert.match(reply, /initial preference/);
-    const soul = await memory.loadSoul();
-    assert.match(soul, /## User Preferences\n- Prefer TypeScript over Python\./);
+    const merged = "# Soul\n\n## User Preferences\n- Prefer TypeScript over Python."; // LLM 输出经 trim，无尾随换行
+    let captured: ChatMessage[] | undefined;
+    const llm = makeMergeLLM(merged, (m) => (captured = m));
+
+    const reply = await initSoul(memory, llm, "Prefer TypeScript over Python.");
+    assert.match(reply, /LLM curation/);
+    assert.equal(await memory.loadSoul(), merged); // 保存的是 LLM 产出，而非机械拼接
+    // 策展提示词包含现有内容与新输入
+    assert.ok(captured);
+    assert.match(captured![0]!.role === "system" ? captured![0].content : "", /curator/);
+    assert.match(captured![1]!.role === "user" ? captured![1].content : "", /New user input to merge:[\s\S]*Prefer TypeScript/);
   });
 
-  it("/init <pref> 已存在 → 追加偏好，不覆盖既有内容", async () => {
+  it("/init <content> 已存在 → LLM 做冲突改写（旧偏好被替换，非简单追加）", async () => {
     const memory = makeMemory(await freshWorkspace());
-    await initSoul(memory, "pref one");
-    await initSoul(memory, "pref two");
+    await memory.saveSoul("# Soul\n\n## User Preferences\n- Prefer Python.\n");
+    const conflictResolved =
+      "# Soul\n\n## User Preferences\n- Prefer TypeScript (updated from Python, user changed mind).\n";
+    const llm = makeMergeLLM(conflictResolved);
+
+    const reply = await initSoul(memory, llm, "Actually I prefer TypeScript now.");
+    assert.match(reply, /LLM merge/);
     const soul = await memory.loadSoul();
-    assert.match(soul, /- pref one/);
-    assert.match(soul, /- pref two/);
-    assert.match(soul, /## Persistent Facts/); // 模板其余段保留
+    assert.match(soul, /Prefer TypeScript/);
+    assert.ok(!soul.includes("- Prefer Python.")); // 旧条目被改写
+  });
+
+  it("/init <content>：LLM 输出带代码围栏 → 剥离后保存", async () => {
+    const memory = makeMemory(await freshWorkspace());
+    const fenced = "```markdown\n# Soul\n\n## Identity\n- test agent\n```";
+    const llm = makeMergeLLM(fenced);
+    await initSoul(memory, llm, "some input");
+    const soul = await memory.loadSoul();
+    assert.ok(!soul.includes("```"));
+    assert.match(soul, /# Soul/);
+  });
+
+  it("/init <content>：LLM 失败/空输出 → 原文件保持不变，如实报告", async () => {
+    const memory = makeMemory(await freshWorkspace());
+    await memory.saveSoul("original soul");
+    const failLLM = {
+      chat: async () => ({ type: "final", text: "  " }),
+    } as unknown as LLMProvider;
+    const reply = await initSoul(memory, failLLM, "new input");
+    assert.match(reply, /left unchanged/);
+    assert.equal(await memory.loadSoul(), "original soul");
+
+    const throwLLM = {
+      chat: async () => {
+        throw new Error("network down");
+      },
+    } as unknown as LLMProvider;
+    const reply2 = await initSoul(memory, throwLLM, "new input");
+    assert.match(reply2, /left unchanged/);
+    assert.equal(await memory.loadSoul(), "original soul");
   });
 });
 
@@ -147,7 +198,7 @@ describe("Agent × Soul 注入（Mock LLM）", () => {
   it("新 Session 首 turn：Soul 进入 system 消息的 Persistent Memory 段，并发 memory_loaded 事件", async () => {
     const ws = await freshWorkspace();
     const memory = makeMemory(ws);
-    await initSoul(memory, "Prefer TypeScript over Python.");
+    await memory.saveSoul("# Soul\n\n## User Preferences\n- Prefer TypeScript over Python.\n");
 
     const config: AgentConfig = { workspace: ws, maxSteps: 5, apiKey: "unused", model: "mock" };
     const ctx = new Context(config.workspace, config);

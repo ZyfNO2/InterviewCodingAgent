@@ -69,7 +69,7 @@ async function main(): Promise<void> {
       if (currentTask.startsWith("/init")) {
         const pref = currentTask.slice("/init".length).trim();
         const memory = ctx.resolve<MarkdownMemoryService>("memory");
-        console.log(await initSoul(memory, pref || undefined));
+        console.log(await initSoul(memory, llm, pref || undefined));
         currentTask = undefined;
         continue;
       }
