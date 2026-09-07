@@ -34,3 +34,6 @@ Thumbs.db
 *.ntvs*
 *.njsproj
 *.sln
+
+# demo test residue
+examples/demo/big.txt

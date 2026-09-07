@@ -63,6 +63,19 @@ npm start -- --workspace ./examples/demo --max-steps 20 "你的任务"
 # 不带任务参数则进入交互模式，逐条输入任务
 ```
 
+### WebUI（本地演示）
+
+```bash
+npm run build
+npm run web          # 启动后端（默认 http://127.0.0.1:8046，可用 WEB_PORT 覆盖）
+# 浏览器打开 http://127.0.0.1:8046 ，右上角 Source 切到 "Live API" 即接真实 Runtime
+```
+
+- 前端 `web/` 与 Runtime 只通过 `AgentEvent` / `AgentReply` 契约（doc 04 A.3）+ HTTP 通信，不 import `src/` 内部实现。
+- 传输：`GET /api/run?task=...`（SSE 下推契约事件）+ `POST /api/reply`（ask 应答上行）；单会话内存态，新 run 覆盖旧 run。
+- ask_user（输入框作答）与 Permission（Approve/Reject 按钮）在网页上暂停-恢复 Agent，与 CLI readline 是同一交互层的两种实现。
+- ⚠️ **本地 only**：服务无鉴权，仅监听 127.0.0.1，**勿暴露公网**。workspace 可经 `?workspace=` 指定（必须存在），文件工具的越权校验不放宽。
+
 - `--workspace <dir>`：Agent 工作根目录，默认 `process.cwd()`。所有文件工具被约束在该目录内，逃逸路径直接拒绝。
 - `--max-steps <n>`：Agent Loop 步数上限，默认 20，达到上限返回明确提示而非死循环。
 - 运行时打印每轮 tool 调用（名称 + 参数摘要）、tool 结果摘要、最终答案。

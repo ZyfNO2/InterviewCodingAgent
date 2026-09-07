@@ -264,7 +264,7 @@ export class SseEventSource extends BaseEventSource {
     try {
       await fetch(`${this.baseUrl}/api/reply`, {
         method: 'POST',
-        headers: { 'Content-Uri': 'application/json', 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reply),
       });
     } catch (err) {
