@@ -2,21 +2,11 @@ import type { AgentConfig, ChatMessage, LLMResponse, ToolCall } from "./types.js
 import { serializeToolCall } from "./types.js";
 import type { Context } from "../core/context.js";
 import { ToolRegistry } from "../tools/registry.js";
+import { createSession, type AgentSession } from "../core/session.js";
 import { resolveToolResultCharLimit, truncateToolResultOutput } from "../core/context-manager.js";
 import type { LLMProvider } from "../llm/provider.js";
 
-export const SYSTEM_PROMPT = `You are a coding agent working inside a sandboxed workspace directory.
-You can use these tools:
-- read_file({ path }): read a text file inside the workspace
-- write_file({ path, content }): write or overwrite a text file inside the workspace (parent dirs auto-created)
-- shell({ command }): run a shell command with the workspace as cwd
-- ask_user({ question }): ask the human user a question and wait for their typed answer
-
-Rules:
-- All file paths are relative to the workspace root. Paths escaping the workspace are rejected.
-- Dangerous tools (write_file, shell) require human approval before running; if denied, do not retry the same action.
-- Tool errors are returned to you as text. Read them, fix the problem, and retry differently.
-- When the task is complete, reply with a concise natural-language answer (no tool calls).`;
+export { SYSTEM_PROMPT } from "../core/session.js";
 
 export interface AgentResult {
   finalText: string;
@@ -35,12 +25,38 @@ export class Agent {
     private readonly onEvent?: (event: AgentEvent) => void,
   ) {}
 
-  async run(task: string): Promise<AgentResult> {
+  /**
+   * 运行一个用户任务（doc 09：run 与 Session 分离）。
+   * 新签名 run(session, task)：消息读写 session.messages，连续任务共享历史。
+   * 旧签名 run(task) 保留为过渡：内部包临时 session（行为与 Step1 之前一致）。
+   */
+  async run(sessionOrTask: AgentSession | string, maybeTask?: string): Promise<AgentResult>;
+  async run(task: string): Promise<AgentResult>;
+  async run(sessionOrTask: AgentSession | string, maybeTask?: string): Promise<AgentResult> {
+    const [session, task] =
+      typeof sessionOrTask === "string"
+        ? [createSession(), sessionOrTask]
+        : [sessionOrTask, maybeTask ?? ""];
+    if (!task) {
+      throw new Error("task is required");
+    }
+
+    // Session 事件（旁路）：首 turn 视为建会话；每个用户任务一个 session_turn
+    if (session.userTurns === 0) {
+      this.onEvent?.({ type: "session_start", sessionId: session.id });
+    }
+    this.onEvent?.({
+      type: "session_turn",
+      sessionId: session.id,
+      userTurns: session.userTurns + 1,
+      task,
+    });
     this.onEvent?.({ type: "run_start", task, workspace: this.ctx.workspace });
-    const messages: ChatMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: task },
-    ];
+
+    // 消息来源 = session.messages（system prompt 建会话时已入一次）
+    session.userTurns++;
+    const messages = session.messages;
+    messages.push({ role: "user", content: task });
 
     for (let step = 1; step <= this.config.maxSteps; step++) {
       const res = await this.llm.chat(messages, this.tools.toLLMSchema());
@@ -84,6 +100,8 @@ export class Agent {
 
 export type AgentEvent =
   | { type: "run_start"; task: string; workspace: string }
+  | { type: "session_start"; sessionId: string }
+  | { type: "session_turn"; sessionId: string; userTurns: number; task: string }
   | { type: "llm_call"; step: number; request: ChatMessage[]; response: LLMResponse }
   | { type: "tool_call"; step: number; call: ToolCall }
   | { type: "tool_result"; step: number; call: ToolCall; result: { ok: boolean; output: string } }

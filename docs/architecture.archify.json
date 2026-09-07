@@ -1,0 +1,330 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Minimal Coding Agent 演进架构与落地现状全景图",
+    "locale": "zh-CN",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "implemented-core",
+        "label": "当前已实现核心链路",
+        "focus": ["cli", "agent-loop", "context-di", "llm-provider", "tool-registry", "perm-service", "tools-impl", "trace-recorder"],
+        "note": "聚焦 Phase 1/Phase 2 当前已完全交付的 Runtime 核心、安全审批与 Trace"
+      },
+      {
+        "id": "planned-evolution",
+        "label": "Plan 规划中进阶扩展",
+        "focus": ["webui", "agent-loop", "context-mgr", "concurrency-pool", "tool-registry"],
+        "note": "聚焦 Plan/04-WebUI 与 Plan/07-并发池及上下文截断/预算规划"
+      },
+      {
+        "id": "pending-research",
+        "label": "Plan 外部待更新规划",
+        "focus": ["hermes-soul", "context-mgr", "session-isolation", "team-subagent", "agent-loop"],
+        "note": "聚焦 Soul.md 自我沉淀、KV 稳定、Session 隔离与 Subagent 待更新项"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "cli",
+      "type": "frontend",
+      "label": "CLI 终端驱动",
+      "sublabel": "cli.ts + prompt.ts",
+      "tag": "已实现",
+      "pos": [40, 200],
+      "size": [150, 70]
+    },
+    {
+      "id": "webui",
+      "type": "frontend",
+      "label": "WebUI / SSE 演示层",
+      "sublabel": "Plan/04 & 06",
+      "tag": "规划中 (Plan)",
+      "pos": [40, 420],
+      "size": [150, 70]
+    },
+    {
+      "id": "agent-loop",
+      "type": "backend",
+      "label": "AgentLoop 状态机",
+      "sublabel": "agent/agent.ts",
+      "tag": "已实现 (核心)",
+      "pos": [280, 200],
+      "size": [160, 75]
+    },
+    {
+      "id": "context-di",
+      "type": "backend",
+      "label": "Context DI 容器",
+      "sublabel": "core/context.ts",
+      "tag": "已实现",
+      "pos": [280, 50],
+      "size": [160, 65]
+    },
+    {
+      "id": "llm-provider",
+      "type": "backend",
+      "label": "LLMProvider 适配层",
+      "sublabel": "llm/provider.ts",
+      "tag": "已实现",
+      "brand": "openai",
+      "pos": [540, 50],
+      "size": [160, 65]
+    },
+    {
+      "id": "context-mgr",
+      "type": "backend",
+      "label": "ContextManager",
+      "sublabel": "截断已实现 / 压缩规划",
+      "tag": "规划中 (Plan/07)",
+      "pos": [280, 380],
+      "size": [160, 75]
+    },
+    {
+      "id": "tool-registry",
+      "type": "backend",
+      "label": "ToolRegistry 调度器",
+      "sublabel": "tools/registry.ts",
+      "tag": "已实现",
+      "pos": [540, 200],
+      "size": [160, 75]
+    },
+    {
+      "id": "perm-service",
+      "type": "security",
+      "label": "PermissionService",
+      "sublabel": "core/permission.ts",
+      "tag": "已实现",
+      "pos": [800, 200],
+      "size": [160, 75]
+    },
+    {
+      "id": "concurrency-pool",
+      "type": "backend",
+      "label": "有限并发执行池",
+      "sublabel": "Bounded Pool",
+      "tag": "规划中 (Plan/07)",
+      "pos": [540, 380],
+      "size": [160, 75]
+    },
+    {
+      "id": "tools-impl",
+      "type": "backend",
+      "label": "核心工具套件",
+      "sublabel": "read/write/shell/ask",
+      "tag": "已实现 (4工具)",
+      "pos": [800, 380],
+      "size": [160, 75]
+    },
+    {
+      "id": "trace-recorder",
+      "type": "database",
+      "label": "TraceRecorder 事实审计",
+      "sublabel": "run-*.jsonl",
+      "tag": "已实现 (旁路)",
+      "pos": [410, 540],
+      "size": [170, 70]
+    },
+    {
+      "id": "hermes-soul",
+      "type": "external",
+      "label": "Soul.md 自我沉淀",
+      "sublabel": "Hermes / 提示词注入",
+      "tag": "待更新 (非Plan)",
+      "pos": [40, 700],
+      "size": [160, 75]
+    },
+    {
+      "id": "session-isolation",
+      "type": "database",
+      "label": "Session 会话隔离",
+      "sublabel": "多租户会话与KV稳定",
+      "tag": "待更新 (非Plan)",
+      "pos": [280, 700],
+      "size": [160, 75]
+    },
+    {
+      "id": "team-subagent",
+      "type": "cloud",
+      "label": "Subagent / Team",
+      "sublabel": "多 Agent 协作系统",
+      "tag": "待更新 (非Plan)",
+      "pos": [540, 700],
+      "size": [160, 75]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "落地基线与进阶规划 (In Plan 文件夹)",
+      "wraps": ["cli", "webui", "agent-loop", "context-di", "llm-provider", "context-mgr", "tool-registry", "perm-service", "concurrency-pool", "tools-impl", "trace-recorder"]
+    },
+    {
+      "kind": "region",
+      "label": "外部待更新演进域 (Not In Plan 文件夹)",
+      "wraps": ["hermes-soul", "session-isolation", "team-subagent"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "cli-to-agent",
+      "from": "cli",
+      "to": "agent-loop",
+      "label": "run(task)"
+    },
+    {
+      "id": "agent-to-cli",
+      "from": "agent-loop",
+      "to": "cli",
+      "label": "AgentEvent 流",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "labelDy": 24
+    },
+    {
+      "id": "webui-to-agent",
+      "from": "webui",
+      "to": "agent-loop",
+      "label": "SSE 交互",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDy": -20
+    },
+    {
+      "id": "agent-to-ctx",
+      "from": "agent-loop",
+      "to": "context-di",
+      "label": "依赖注入",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDy": -20
+    },
+    {
+      "id": "agent-to-llm",
+      "from": "agent-loop",
+      "to": "llm-provider",
+      "label": "chat() 驱动",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "agent-to-registry",
+      "from": "agent-loop",
+      "to": "tool-registry",
+      "label": "executeBatch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "agent-to-ctxmgr",
+      "from": "agent-loop",
+      "to": "context-mgr",
+      "label": "上下文维护",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "registry-to-perm",
+      "from": "tool-registry",
+      "to": "perm-service",
+      "label": "安全拦截",
+      "variant": "security"
+    },
+    {
+      "id": "registry-to-pool",
+      "from": "tool-registry",
+      "to": "concurrency-pool",
+      "label": "批次分派",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "perm-to-tools",
+      "from": "perm-service",
+      "to": "tools-impl",
+      "label": "放行执行",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "tools-to-trace",
+      "from": "tools-impl",
+      "to": "trace-recorder",
+      "label": "事件落盘",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "via": [[880, 575]]
+    },
+    {
+      "id": "ctxmgr-to-trace",
+      "from": "context-mgr",
+      "to": "trace-recorder",
+      "label": "事实留存",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [[360, 575]]
+    },
+    {
+      "id": "ctxmgr-to-session",
+      "from": "context-mgr",
+      "to": "session-isolation",
+      "label": "多轮隔离",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "soul-to-ctxmgr",
+      "from": "hermes-soul",
+      "to": "context-mgr",
+      "label": "人设注入",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "ctxmgr-to-team",
+      "from": "context-mgr",
+      "to": "team-subagent",
+      "label": "任务派发",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "已实现 (Implemented Baseline)",
+      "items": [
+        "AgentLoop 状态机 + Context DI 极简解耦容器",
+        "LLMProvider 支持 OpenAI / DeepSeek 等兼容端点",
+        "ToolRegistry 批处理 (executeBatch) + 4项核心工具",
+        "CliPermissionService 危险命令拦截审批 [y/N]",
+        "TraceRecorder 全量写入 run-*.jsonl 事实日志"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "规划中 (In Plan 文件夹)",
+      "items": [
+        "Plan/04 & 06: WebUI / HTTP Server SSE 流式交互接入",
+        "Plan/07: ContextManager 历史压缩 (Compact) 与 Token 预算",
+        "Plan/07: 有限并发执行池 (Bounded Concurrency Pool) 信号量"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "待更新 (Not in Plan 文件夹)",
+      "items": [
+        "Soul.md: 初始化与自我沉淀 (Hermes 风格人设注入)",
+        "Context Memory / KV 稳定与持久化记忆系统",
+        "Session 会话级上下文独立与多租户隔离",
+        "Subagent / AgentTeam 多智能体协同分工系统"
+      ]
+    }
+  ]
+}

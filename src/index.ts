@@ -10,6 +10,7 @@ import { shellTool } from "./tools/shell.js";
 import { createAskUserTool } from "./tools/ask-user.js";
 import { CliPermissionService } from "./core/permission.js";
 import { TraceRecorder } from "./core/trace.js";
+import { createSession } from "./core/session.js";
 import { prompt, closePrompt } from "./cli/prompt.js";
 import { parseArgs, readTaskInteractively, renderEvent } from "./cli/cli.js";
 
@@ -50,6 +51,9 @@ async function main(): Promise<void> {
     await trace.record({ ts: new Date().toISOString(), event });
   });
 
+  // CLI：单进程 = 单 Session，连续输入沿用同一 session.messages（doc 09）
+  const session = createSession();
+
   // 主循环：任务为空则继续交互读入
   let currentTask = task;
   while (true) {
@@ -59,7 +63,7 @@ async function main(): Promise<void> {
     }
 
     try {
-      await agent.run(currentTask);
+      await agent.run(session, currentTask);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`Agent run failed: ${message}`);

@@ -11,6 +11,7 @@ import { writeFileTool } from "../tools/write-file.js";
 import { shellTool } from "../tools/shell.js";
 import { createAskUserTool } from "../tools/ask-user.js";
 import { CliPermissionService } from "../core/permission.js";
+import { createSession, type AgentSession } from "../core/session.js";
 
 /**
  * Web 后端（doc 06 接线）：把 Mock 前端接到真实 Runtime。
@@ -57,6 +58,9 @@ interface Session {
   res: http.ServerResponse;
   pending: Map<string, PendingAsk>;
 }
+
+/** sessionId → AgentSession（doc 09：WebUI 多会话隔离，进程内存态） */
+const agentSessions = new Map<string, AgentSession>();
 
 let current: Session | null = null;
 let askSeq = 0;
@@ -134,7 +138,13 @@ function sendEvent(session: Session, event: ContractEvent): void {
 }
 
 /** 组装与 index.ts 相同的 Context/Registry/Agent，仅 prompt 与 onEvent 换成 Web 实现 */
-async function startRun(task: string, workspace: string, maxSteps: number, res: http.ServerResponse): Promise<void> {
+async function startRun(
+  task: string,
+  workspace: string,
+  maxSteps: number,
+  res: http.ServerResponse,
+  agentSession: AgentSession,
+): Promise<void> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
@@ -179,7 +189,7 @@ async function startRun(task: string, workspace: string, maxSteps: number, res: 
   });
 
   try {
-    await agent.run(task);
+    await agent.run(agentSession, task);
     // done 事件已发出；保持 SSE 打开，避免 EventSource 自动重连导致重复 run
   } catch (err) {
     send({ type: "error", message: err instanceof Error ? err.message : String(err) });
@@ -231,8 +241,18 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    console.log(`[web] run start: task="${task}" workspace="${workspaceAbs}"`);
-    await startRun(task, workspaceAbs, maxSteps, res);
+    // doc 09：sessionId → AgentSession（带 id 且存在则复用历史，否则新建）
+    const requestedId = url.searchParams.get("sessionId") ?? undefined;
+    let agentSession = requestedId ? agentSessions.get(requestedId) : undefined;
+    if (!agentSession) {
+      agentSession = createSession(requestedId);
+      agentSessions.set(agentSession.id, agentSession);
+    }
+
+    console.log(
+      `[web] run start: task="${task}" workspace="${workspaceAbs}" session=${agentSession.id} (turn ${agentSession.userTurns + 1})`,
+    );
+    await startRun(task, workspaceAbs, maxSteps, res, agentSession);
     return;
   }
 
