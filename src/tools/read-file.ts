@@ -12,6 +12,8 @@ export const readFileTool: Tool = {
   description:
     "Read the text content of a file inside the workspace. Returns the file content, or an error if the file does not exist or the path escapes the workspace.",
   schema: readFileSchema,
+  risk: "safe",
+  parallelSafe: true,
   async execute(args: unknown, ctx: Context) {
     const parsed = readFileSchema.safeParse(args);
     if (!parsed.success) {

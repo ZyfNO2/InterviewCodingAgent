@@ -1,5 +1,5 @@
-import * as readline from "node:readline/promises";
 import type { AgentEvent } from "../agent/agent.js";
+import { prompt } from "./prompt.js";
 
 /** 参数解析 + readline 交互 + 输出渲染。 */
 export function parseArgs(argv: string[]): {
@@ -70,6 +70,15 @@ export function renderEvent(event: AgentEvent): void {
       console.log(`[step ${event.step}] tool_result (${event.result.ok ? "ok" : "error"}): ${preview}`);
       break;
     }
+    case "batch": {
+      const parts: string[] = [];
+      for (const size of event.stats.parallelGroups) {
+        if (size > 1) parts.push(`parallel x${size}`);
+      }
+      if (event.stats.sequential > 0) parts.push(`sequential x${event.stats.sequential}`);
+      console.log(`[step ${event.step}] batch of ${event.calls.length} (${parts.join(", ")})`);
+      break;
+    }
     case "final":
       console.log(`\n=== Final Answer (step ${event.step}) ===\n${event.text}\n`);
       break;
@@ -79,14 +88,9 @@ export function renderEvent(event: AgentEvent): void {
   }
 }
 
-/** 交互式读入任务；Ctrl+D / 空输入退出。 */
+/** 交互式读入任务；Ctrl+D / 空输入退出。（复用共享 readline，与 Permission/ask_user 同一封装） */
 export async function readTaskInteractively(): Promise<string | undefined> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const answer = await rl.question("\nEnter your task (empty or Ctrl+D to quit): ");
-    const trimmed = answer.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  } finally {
-    rl.close();
-  }
+  const answer = await prompt("\nEnter your task (empty or Ctrl+D to quit): ").catch(() => "");
+  const trimmed = answer.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }

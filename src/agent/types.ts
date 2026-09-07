@@ -5,11 +5,17 @@ export interface ToolResult {
   output: string;
 }
 
+/** 工具风险等级：dangerous 工具执行前需经 PermissionService 批准 */
+export type ToolRisk = "safe" | "dangerous";
+
 // 工具统一接口
 export interface Tool {
   name: string;
   description: string;
   schema: ZodTypeAny; // 入参 schema（zod）
+  risk: ToolRisk;
+  /** 同批多个 tool_calls 时是否可与相邻 parallelSafe 工具并行执行 */
+  parallelSafe: boolean;
   execute(args: unknown, ctx: Context): Promise<ToolResult>;
 }
 

@@ -15,6 +15,8 @@ export const writeFileTool: Tool = {
   description:
     "Write (or overwrite) a text file inside the workspace, creating parent directories automatically.",
   schema: writeFileSchema,
+  risk: "dangerous",
+  parallelSafe: false,
   async execute(args: unknown, ctx: Context) {
     const parsed = writeFileSchema.safeParse(args);
     if (!parsed.success) {

@@ -69,13 +69,41 @@ npm start -- --workspace ./examples/demo --max-steps 20 "你的任务"
 
 ## 工具
 
-| 工具 | 入参 | 行为 |
-| --- | --- | --- |
-| `read_file` | `{ path }` | 读取 workspace 内文件，返回文本内容 |
-| `write_file` | `{ path, content }` | 写入/覆盖 workspace 内文件，自动建父目录 |
-| `shell` | `{ command }` | 在 workspace 下执行命令，返回 `exit` + `stdout` + `stderr`（60s 超时） |
+| 工具 | 入参 | risk | parallelSafe | 行为 |
+| --- | --- | --- | --- | --- |
+| `read_file` | `{ path }` | safe | true | 读取 workspace 内文件，返回文本内容 |
+| `write_file` | `{ path, content }` | dangerous | false | 写入/覆盖 workspace 内文件，自动建父目录 |
+| `shell` | `{ command }` | dangerous | false | 在 workspace 下执行命令，返回 `exit` + `stdout` + `stderr`（60s 超时） |
+| `ask_user` | `{ question }` | safe | false | 暂停 Agent，向人类提问，答案作为 ToolResult 回灌后恢复 |
 
 错误一律以结构化文本回灌模型（`ToolResult{ ok:false }`）而非中断，让 Loop 有自我纠正机会。
+
+## 阶段二能力扩展
+
+三个能力都挂在 **Context / Registry** 扩展点上，Agent Loop 核心保持简单。
+
+### Permission Control（Feature A）
+
+- `Tool` 新增 `risk: "safe" | "dangerous"`；危险工具执行前必须经 `PermissionService.check()` 批准。
+- 调用链：`Agent → Registry.execute → PermissionService.check → Tool.execute`——permission 逻辑集中在 Registry 一处。
+- CLI 实现：`Approve <tool> <参数摘要> [y/N]:`（仅 `y`/`yes` 放行）；EOF / 读入失败一律视为拒绝（**fail-closed**）。
+- 未注册 permission 服务时，危险工具直接拒绝。
+- 拒绝时模型收到 `denied by user`，可合理收尾而不是崩溃重试。
+- 已验证：`n` → 命令不执行、模型报告被拒；`y` → 正常执行；`read_file`（safe）不触发提示。
+
+### ask_user（Feature B）
+
+- `LLM → ask_user → Agent 暂停 → CLI 输入 → Tool Result → Agent 恢复`，证明 Loop 支持 `LLM → Environment → Human → Agent` 闭环。
+- 与 Permission 复用同一个共享 readline 封装（`src/cli/prompt.ts`，内部带行缓冲队列，管道/交互两种输入模式均不丢行）。
+- 已验证：信息不足时模型主动调用 `ask_user`，人类输入的文件名被采纳并实际创建文件。
+
+### Parallel Tool Calling（Feature C）
+
+- `Tool` 新增 `parallelSafe: boolean`；Registry 新增 `executeBatch(calls, ctx)`：
+  连续的 parallelSafe 工具分组 `Promise.all` 并行，其余逐个 `await`；结果严格按原 call 顺序回灌。
+- 不做复杂 Scheduler；Permission 逐个检查（危险工具本就非 parallelSafe）。
+- 运行时日志会打印批次信息，如 `[step 1] batch of 3 (parallel x3)`。
+- 单元测试用耗时探针证明并发真实发生（3×120ms 批次耗时 ≪ 360ms 顺序基线）。
 
 ## 验证过的功能 Case
 
@@ -111,6 +139,9 @@ npm start -- --workspace ./examples/demo --max-steps 20 "你的任务"
 | `tests/registry.test.ts` | register 重名报错 / get / list / toLLMSchema 结构 / execute 四类失败回灌不抛出 |
 | `tests/tools.test.ts` | read/write 往返、自动建父目录、路径越权（相对/绝对）被拒、shell 退出码与 stdout/stderr 捕获、cwd |
 | `tests/agent.test.ts` | Mock LLM（经 Context 注入 `"llm"`）驱动多轮闭环：tool_calls → 执行 → 回灌 → final；maxSteps 兜底；错误回灌不中断 |
+| `tests/permission.test.ts` | 无 permission 服务 fail-closed、拒绝时工具未执行、批准执行、safe 工具零检查、CLI y/yes 语义、EOF 视为拒绝 |
+| `tests/ask-user.test.ts` | 人类输入回灌、接口形状（safe/非并行）、zod 失败、EOF 不崩溃 |
+| `tests/parallel.test.ts` | 并发探针证明真实并行、混合批次顺序语义、真实工具 parallelSafe 标记、批次中失败不阻塞、batchStats 分组 |
 
 ## 关键设计取舍
 

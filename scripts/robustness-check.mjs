@@ -1,5 +1,6 @@
 // 健壮性直接验证：路径逃逸 / 未知工具 / 非法 JSON / zod 校验失败（不经过 LLM）
 import { Context } from "../dist/core/context.js";
+import { AllowAllPermissionService } from "../dist/core/permission.js";
 import { ToolRegistry } from "../dist/tools/registry.js";
 import { readFileTool } from "../dist/tools/read-file.js";
 import { writeFileTool } from "../dist/tools/write-file.js";
@@ -16,6 +17,8 @@ const registry = new ToolRegistry();
 registry.register(readFileTool);
 registry.register(writeFileTool);
 registry.register(shellTool);
+// 危险工具 fail-closed：脚本场景注入全放行 Permission
+ctx.provide("permission", new AllowAllPermissionService());
 
 const cases = [
   { name: "path escape ../", call: { id: "t1", name: "read_file", arguments: '{"path":"../../.env"}' } },

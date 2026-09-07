@@ -91,6 +91,8 @@ describe("ToolRegistry", () => {
       name: "boom",
       description: "always throws",
       schema: z.object({}),
+      risk: "safe",
+      parallelSafe: false,
       async execute() {
         throw new Error("boom");
       },

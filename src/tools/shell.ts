@@ -19,6 +19,8 @@ export const shellTool: Tool = {
   description:
     "Execute a shell command in the workspace directory. Returns exit code, stdout and stderr. Times out after 60 seconds.",
   schema: shellSchema,
+  risk: "dangerous",
+  parallelSafe: false,
   async execute(args: unknown, ctx: Context) {
     const parsed = shellSchema.safeParse(args);
     if (!parsed.success) {

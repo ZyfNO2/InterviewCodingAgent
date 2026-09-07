@@ -7,6 +7,9 @@ import { ToolRegistry } from "./tools/registry.js";
 import { readFileTool } from "./tools/read-file.js";
 import { writeFileTool } from "./tools/write-file.js";
 import { shellTool } from "./tools/shell.js";
+import { createAskUserTool } from "./tools/ask-user.js";
+import { CliPermissionService } from "./core/permission.js";
+import { prompt, closePrompt } from "./cli/prompt.js";
 import { parseArgs, readTaskInteractively, renderEvent } from "./cli/cli.js";
 
 async function main(): Promise<void> {
@@ -32,8 +35,10 @@ async function main(): Promise<void> {
   tools.register(readFileTool);
   tools.register(writeFileTool);
   tools.register(shellTool);
+  tools.register(createAskUserTool(prompt)); // Feature B：与 Permission 复用同一 readline 封装
   ctx.provide("llm", llm);
   ctx.provide("tools", tools);
+  ctx.provide("permission", new CliPermissionService(prompt)); // Feature A：危险工具需人类批准
 
   const agent = new Agent(llm, tools, ctx, config, (event: AgentEvent) => renderEvent(event));
 
@@ -53,6 +58,7 @@ async function main(): Promise<void> {
     }
     currentTask = undefined; // 回到交互模式
   }
+  closePrompt();
 }
 
 main().catch((err) => {
