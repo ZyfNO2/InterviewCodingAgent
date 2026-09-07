@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Minimal Coding Agent 架构设计",
+    "locale": "zh-CN",
+    "output": "minimal-coding-agent.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "agent-loop",
+        "label": "Agent 核心调度链路",
+        "focus": ["cli", "loop", "llm"],
+        "note": "CLI 接收用户输入，Agent Loop 驱动 LLM 进行多轮推理与 Tool Calling 决策。"
+      },
+      {
+        "id": "di-and-registry",
+        "label": "依赖容器与工具注册",
+        "focus": ["loop", "ctx", "registry"],
+        "note": "基于 Context 容器注入运行时依赖，Tool Registry 管理 Zod Schema 与函数映射。"
+      },
+      {
+        "id": "tool-execution",
+        "label": "工具执行与沙箱约束",
+        "focus": ["registry", "tools_fs", "tool_shell", "guard", "workspace"],
+        "note": "工具经由权限门禁与路径逃逸校验，在本地受控 Workspace 中安全执行。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "cli",
+      "type": "frontend",
+      "label": "CLI 交互终端",
+      "sublabel": "readline / 参数解析",
+      "pos": [40, 240],
+      "size": [130, 60]
+    },
+    {
+      "id": "loop",
+      "type": "backend",
+      "label": "Agent Loop 核心",
+      "sublabel": "maxSteps / 状态推进",
+      "tag": "调度中枢",
+      "pos": [240, 240],
+      "size": [140, 64]
+    },
+    {
+      "id": "llm",
+      "type": "cloud",
+      "label": "LLM 接口服务",
+      "sublabel": "OpenAI Compatible API",
+      "tag": "Tool Calling",
+      "pos": [240, 80],
+      "size": [140, 60]
+    },
+    {
+      "id": "ctx",
+      "type": "backend",
+      "label": "Runtime Context",
+      "sublabel": "依赖注入 / Service Container",
+      "pos": [450, 240],
+      "size": [150, 60]
+    },
+    {
+      "id": "registry",
+      "type": "backend",
+      "label": "Tool Registry",
+      "sublabel": "Schema 导出 / 路由寻址",
+      "pos": [670, 240],
+      "size": [140, 60]
+    },
+    {
+      "id": "tools_fs",
+      "type": "backend",
+      "label": "FS Tools",
+      "sublabel": "read_file / write_file",
+      "pos": [880, 150],
+      "size": [130, 60]
+    },
+    {
+      "id": "tool_shell",
+      "type": "backend",
+      "label": "Shell Tool",
+      "sublabel": "子进程执行 / 捕获输出",
+      "pos": [880, 240],
+      "size": [130, 60]
+    },
+    {
+      "id": "guard",
+      "type": "security",
+      "label": "Permission 门禁",
+      "sublabel": "ask_user / 高危拦截",
+      "pos": [880, 330],
+      "size": [130, 60]
+    },
+    {
+      "id": "workspace",
+      "type": "database",
+      "label": "Workspace 沙箱",
+      "sublabel": "受限工作区文件系统",
+      "tag": "防路径逃逸",
+      "pos": [1080, 210],
+      "size": [140, 64]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Agent Runtime 进程边界 (Node.js / TS)",
+      "wraps": ["loop", "ctx", "registry", "tools_fs", "tool_shell", "guard"]
+    },
+    {
+      "kind": "security-group",
+      "label": "工作区隔离边界",
+      "wraps": ["workspace"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "cli-to-loop",
+      "from": "cli",
+      "to": "loop",
+      "label": "任务输入",
+      "variant": "emphasis"
+    },
+    {
+      "id": "loop-to-llm",
+      "from": "loop",
+      "to": "llm",
+      "label": "推理请求"
+    },
+    {
+      "id": "loop-to-ctx",
+      "from": "loop",
+      "to": "ctx",
+      "label": "获取依赖"
+    },
+    {
+      "id": "ctx-to-registry",
+      "from": "ctx",
+      "to": "registry",
+      "label": "查找工具"
+    },
+    {
+      "id": "registry-to-fs",
+      "from": "registry",
+      "to": "tools_fs",
+      "label": "执行文件调用"
+    },
+    {
+      "id": "registry-to-shell",
+      "from": "registry",
+      "to": "tool_shell",
+      "label": "执行命令调用"
+    },
+    {
+      "id": "registry-to-guard",
+      "from": "registry",
+      "to": "guard",
+      "label": "权限核验",
+      "variant": "security"
+    },
+    {
+      "id": "fs-to-workspace",
+      "from": "tools_fs",
+      "to": "workspace",
+      "label": "文件读写"
+    },
+    {
+      "id": "shell-to-workspace",
+      "from": "tool_shell",
+      "to": "workspace",
+      "label": "沙箱执行"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "控制与调度策略",
+      "items": [
+        "AgentLoop 承担步数保护 (maxSteps) 与多轮状态推进",
+        "遵循 OpenAI 协议标准 assistant.tool_calls 与结构化回灌"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "DSH 工程化解耦",
+      "items": [
+        "轻量 Context 容器隔离运行时依赖，避免组件硬编码耦合",
+        "Tool Registry 统一维护 Zod Schema 校验与函数调用映射"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "沙箱与安全防御",
+      "items": [
+        "所有文件操作基于 workspace 绝对路径解析，严防路径穿越",
+        "高危 Shell 命令与用户提问由 Permission / ask_user 拦截"
+      ]
+    }
+  ]
+}
